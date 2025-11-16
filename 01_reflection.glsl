@@ -31,16 +31,26 @@ const float rayEps = 1e-2;
 // The pixel space [0, w) x [0, h) is what the fragCoord covers
 // The transform returned by this method can transform a homogenized pixel coord
 //  to the *unnormalized* ray direction in the camera space
+// 屏幕空间像素 → 相机空间光线方向
 mat3 getPixelToCamera(float w, float h, float fov) {
-    return mat3(1, 0, 0, 0, 1, 0, -w/2., -h/2., -h/tan(radians(fov/2.))/2.);
+    return mat3(
+        1, 0, 0,
+        0, 1, 0,
+        -w/2., -h/2., -h/tan(radians(fov/2.))/2.
+    );
 }
 
 // Get the camera space to world space transform
 // where o is the ray origin, t is the target, u is the up vector
+// 把相机坐标系中的方向向量，旋转回世界坐标系
 mat3 getCameraToWorld(vec3 o, vec3 t, vec3 u) {
-    vec3 ez = normalize(o - t);
-    vec3 ex = normalize(cross(u, ez));
-    vec3 ey = cross(ez, ex);
+    vec3 ez = normalize(o - t);          // camera forward (指向背后，因为OpenGL camera向 -Z)
+    vec3 ex = normalize(cross(u, ez));   // right axis 右轴
+    vec3 ey = cross(ez, ex);             // up axis   上轴
+
+    // ex.x ey.x ez.x
+    // ex.y ey.y ez.y
+    // ex.z ey.z ez.z
     return mat3(ex, ey, ez);
 }
 
@@ -169,33 +179,34 @@ vec3 Li(vec3 ro, vec3 rd) {
 }
 
 // Camera animation
+// 获得摄像机的世界坐标
 vec3 getCameraPos(float t) {
     float T = 1000.0;  // period
-    float w = radians(360.) / T;
-    float x = 8. * sin(w*t);
-    float z = 8. * cos(w*t);
-    float y = 5.0;
+    float w = radians(360.) / T;  // 把角度（degrees）转换为弧度（radians）  2pi/1000
+    float x = 8. * sin(w*t);      // 8 * sin(2pi/1000 * 游戏运行的秒数)    1000s 一个循环
+    float z = 8. * cos(w*t);      // 8 * cos(2pi/1000 * 游戏运行的秒数)    1000s 一个循环
+    float y = 5.0;                // 高度 5
     return vec3(x, y, z);
 }
 
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
     // Initialization
-    aspect = iResolution.x / iResolution.y;
+    aspect = iResolution.x / iResolution.y; // iResolution 整体的分辨率参数
     ambient = 0.5;
-    shininess = 50.;
+    shininess = 50.;      // Phong / Blinn-Phong Specular Coefficient (Like PBR Roughness)
     
     vec3 col;
 
     float fov = 60.;
-    vec3 eye = getCameraPos(iTime);
-    vec3 target = vec3(0, 0., 0);
-    vec3 up = vec3(0, 1, 0);
+    vec3 eye = getCameraPos(iTime);  // 获得摄像机的世界坐标
+    vec3 target = vec3(0, 0., 0);    // 看向的方向
+    vec3 up = vec3(0, 1, 0);         // 摄像机 up 方向
 
-    mat3 pixelToCamera = getPixelToCamera(iResolution.x, iResolution.y, fov);
-    mat3 cameraToWorld = getCameraToWorld(eye, target, up);
-    vec3 rd = cameraToWorld * normalize(pixelToCamera * vec3(fragCoord + 0.5, 1.0));
-    vec3 ro = eye;
+    mat3 pixelToCamera = getPixelToCamera(iResolution.x, iResolution.y, fov);  // 屏幕空间像素 screen -> 相机空间光线方向 camera (做 raymarching 的准备)
+    mat3 cameraToWorld = getCameraToWorld(eye, target, up);                    // 相机空间光线方向 camera -> 世界空间光线方向 world
+    vec3 rd = cameraToWorld * normalize(pixelToCamera * vec3(fragCoord + 0.5, 1.0)); // ray_direction  屏幕像素空间先转相机空间（做归一化），相机空间再转世界空间
+    vec3 ro = eye;                                                                   // ray_origin
 
     col = Li(ro, rd);
     
