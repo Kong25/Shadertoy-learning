@@ -3,6 +3,6 @@ Try to write some shadertoy projects.
 
 Firtst, reflection. (https://www.shadertoy.com/view/wXfyDM)
 
-Second, water wave.
+Second, water wave. (https://www.shadertoy.com/view/MttfW8)
 
 Third, ray tracing scene.
