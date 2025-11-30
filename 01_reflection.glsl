@@ -1,6 +1,8 @@
 // Fork of "Ray Marching Journey Starts" by JamesZFS. https://shadertoy.com/view/wXscDr
 // 2025-10-05 19:39:55
 
+// 总结：通过 SDF Raytracing （一种 Ray Marching 做法），实现渲染。光线方向都为确定性方向，无噪声。
+
 // Globals:
 float aspect;
 float ambient;
@@ -76,7 +78,7 @@ vec2 sdf(vec3 p) {
     for (int i = 0; i < n_balls; ++i) {
         f = sdfSphere(p - centers[i], 1.);
         if (f < ret.x) {
-            ret = vec2(f, i+1);
+            ret = vec2(f, i+1);   // 找出离最近球的距离
         }
     }
     return ret;
@@ -96,73 +98,87 @@ vec3 shade(vec3 v, vec3 p, vec3 n, vec3 l, vec3 kd, float ks) {
     // return normal(p);
     // Phong model:
     float I = 1.0;
-    vec3 r = reflect(-v, n);
-    return I * (kd * (max(dot(n, l), 0.) + ambient) + ks * pow(max(dot(r, l), 0.0), shininess));
+    vec3 r = reflect(-v, n);  // 反射方向
+
+    // return I * (kd * (max(dot(n, l), 0.) + ambient) + ks * pow(max(dot(r, l), 0.0), shininess));
+    return I * (
+        kd * (max(dot(n, l), 0.) + ambient)   // Ambient + Diffuse
+        + ks * pow(max(dot(r, l), 0.0), shininess)  // Specular
+);
 }
 
 int rayMarch(inout vec3 ro, vec3 rd) {
     int maxSteps = 64;
 
-    for (int i = 0; i < maxSteps; ++i) {
-        if (ro.y < 0.) {  // floor hit
+    for (int i = 0; i < maxSteps; ++i) {   // 用 ro 来做步进
+
+        if (ro.y < 0.) {     // floor hit  步进到 y < 0. ，击中地板
             return 0;
         }
-        vec2 obj = sdf(ro);
+
+        vec2 obj = sdf(ro);  // sphere hit 计算和球的距离，距离小于一定值则返回大于 0.0 的 y 值
         float d = obj.x;
         if (d < rayEps) {
             return int(obj.y);
         }
-        ro += rd * d;
+
+        ro += rd * d;  // 用 d （ro与球表面的距离）来做步进幅度，不可能撞到物体。你知道自己离物体至少 d 的距离 → 往前跳 d 就不会穿模
     }
     return -1; // no hit
 }
 
-vec3 Li_ref(vec3 ro, vec3 rd) {  // reflected version
+vec3 Li_ref(vec3 ro, vec3 rd) {     // reflected version
     // Ray marching
     int hit = rayMarch(ro, rd);
     
     if (hit == -1 && rd.y >= 0.) {  // sky
         float t = rd.y;  // [0, 1]
+        // 天空渐变色
         vec3 col = mix(vec3(0.824,0.894,0.890), vec3(1.000,1.000,1.000), t);
         // Fog
         col = mix(col, vec3(ambient), exp(-40.*t));
         return col;
     } 
-    else if (hit > 0) { // shape
+    else if (hit > 0) {             // shape
         return shade(-rd, ro, normal(ro), normalize(lightPos - ro), albedos[hit-1], 0.2);
     }
     return vec3(0);
 }
 
 vec3 Li(vec3 ro, vec3 rd) {
+    // 补充知识
+    // Ray Tracing 有显式几何（Mesh / BVH），解析求交 
+    // Ray Marching 使用 SDF，迭代逼近交点
+
     // Ray marching
     int hit = rayMarch(ro, rd);
     
     if (hit == -1 && rd.y >= 0.) {  // sky
         float t = rd.y;  // [0, 1]
+        // 天空渐变色
         vec3 col = mix(vec3(0.824,0.894,0.890), vec3(1.000,1.000,1.000), t);
         // Fog
         col = mix(col, vec3(ambient), exp(-40.*t));
         return col;
     } 
-    else if (hit > 0) { // shape
+    else if (hit > 0) {            // shape
         return shade(-rd, ro, normal(ro), normalize(lightPos - ro), albedos[hit-1], 0.2);
     } 
-    else {  // floor
+    else {                         // floor (hit == 0)
         // Find exact intersection
         float t = -ro.y / rd.y;
-        ro += t * rd;
+        ro += t * rd;      // ro 移为光线与地板的交点
         
         vec3 n = vec3(0, 1, 0);
         vec3 albedo = vec3(0.420,0.420,0.420);
         
         // Diffuse
-        vec3 col = shade(-rd, ro, n, normalize(lightPos - ro), albedo, 0.0);
+        vec3 col = shade(-rd, ro, n, normalize(lightPos - ro), albedo, 0.0);  // specular 项给 0
         //vec3 col = vec3(0.820,0.820,0.820);
         
         // Specular reflection
         vec3 ref = reflect(rd, n);
-        col += 0.5 * albedo * Li_ref(ro + ref * rayEps, ref);   // 反射版的Li
+        col += 0.5 * albedo * Li_ref(ro + ref * rayEps, ref);   // 反射版的Li，从地板交点再发射出光线
         //return col;
         
         // Check shadow
@@ -170,7 +186,7 @@ vec3 Li(vec3 ro, vec3 rd) {
         ro += rd * rayEps;
         hit = rayMarch(ro, rd);
         if (hit <= 0) return col;
-        else {
+        else {       // 击中球部，返回相关的混合阴影颜色
             float t = dot(normal(ro), -rd);
             return mix(col, vec3(ambient) * albedos[hit-1], pow(t, 1.2));
         }
@@ -203,12 +219,13 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     vec3 target = vec3(0, 0., 0);    // 看向的方向
     vec3 up = vec3(0, 1, 0);         // 摄像机 up 方向
 
-    mat3 pixelToCamera = getPixelToCamera(iResolution.x, iResolution.y, fov);  // 屏幕空间像素 screen -> 相机空间光线方向 camera (做 raymarching 的准备)
+    // 标准的光追做法 （这里的光追没做反射，是确定性光追，不是随机采样光追，所以无噪声）
+    mat3 pixelToCamera = getPixelToCamera(iResolution.x, iResolution.y, fov);  // 屏幕空间像素 screen -> 相机空间光线方向 camera (这是标准 true ray tracing（世界空间射线追踪），不是 SSR ray marching)
     mat3 cameraToWorld = getCameraToWorld(eye, target, up);                    // 相机空间光线方向 camera -> 世界空间光线方向 world
     vec3 rd = cameraToWorld * normalize(pixelToCamera * vec3(fragCoord + 0.5, 1.0)); // ray_direction  屏幕像素空间先转相机空间（做归一化），相机空间再转世界空间
     vec3 ro = eye;                                                                   // ray_origin
 
-    col = Li(ro, rd);
+    col = Li(ro, rd);   // SDF 光追
     
     // Output to screen
     fragColor = vec4(col,1.0);
