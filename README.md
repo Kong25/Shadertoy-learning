@@ -8,3 +8,4 @@ Second, water wave. (https://www.shadertoy.com/view/MttfW8)
 Third, ray tracing scene.
 
 Later,FSR,SGSR,SSR,SSRTGI, SS[Specular, GI, AO]...
+SSGI https://www.shadertoy.com/view/dsGBzW
