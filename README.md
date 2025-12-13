@@ -10,3 +10,5 @@ Third, ray tracing scene.
 Later,FSR,SGSR2(https://zhuanlan.zhihu.com/p/8980985121),SSR,SSRTGI, SS[Specular, GI, AO]...
 
 SSGI(https://www.shadertoy.com/view/dsGBzW)
+
+Nvidia SSRTGI (not free)
