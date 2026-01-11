@@ -3,7 +3,11 @@ Try to write some shadertoy projects.
 
 Firtst, reflection. (https://www.shadertoy.com/view/wXfyDM)
 
+
+
 Second, water wave. (https://www.shadertoy.com/view/MttfW8)
+
+
 
 Third, ray tracing scene.
 
@@ -11,4 +15,9 @@ Later,FSR,SGSR2(https://zhuanlan.zhihu.com/p/8980985121),SSR,SSRTGI, SS[Specular
 
 SSGI(https://www.shadertoy.com/view/dsGBzW)
 
+DDGI
+
 Nvidia SSRTGI (not free)
+
+
+Forth, render technique. (Probe)
